@@ -16,12 +16,14 @@ CREATE TABLE IF NOT EXISTS notifications_sent (
 );
 
 CREATE TABLE IF NOT EXISTS scrape_log (
-  id      SERIAL PRIMARY KEY,
-  ran_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  status  TEXT NOT NULL,
-  blocks  INTEGER,
-  error   TEXT
+  id               SERIAL PRIMARY KEY,
+  ran_at           TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  status           TEXT NOT NULL,
+  blocks           INTEGER,
+  error            TEXT,
+  page_fingerprint TEXT
 );
+ALTER TABLE scrape_log ADD COLUMN IF NOT EXISTS page_fingerprint TEXT;
 
 -- Privacy-safe activity log. No PII stored. Never deleted so we can show
 -- all-time counts in the weekly summary email.

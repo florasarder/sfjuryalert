@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import os
 from datetime import date, timedelta
 from typing import Optional
 
@@ -61,14 +62,39 @@ def _fetch_and_parse() -> Optional[list]:
         log.exception("scrape fetch failed")
         db.log_scrape(status="http_error", error=str(exc))
         return None
+
+    fingerprint = scraper.structural_fingerprint(html)
+    _alert_if_structure_changed(fingerprint)
+
     try:
         blocks = scraper.parse(html)
     except Exception as exc:  # noqa: BLE001
         log.exception("scrape parse failed")
-        db.log_scrape(status="parse_error", error=str(exc))
+        db.log_scrape(status="parse_error", error=str(exc), page_fingerprint=fingerprint)
         return None
-    db.log_scrape(status="ok", blocks=len(blocks))
+    db.log_scrape(status="ok", blocks=len(blocks), page_fingerprint=fingerprint)
     return blocks
+
+
+def _alert_if_structure_changed(new_fp: str) -> None:
+    """Email the owner the first time the page's structural fingerprint
+    changes. Silently noops on failure — we never want this path to block
+    the actual scraper work."""
+    try:
+        last_fp = db.last_page_fingerprint()
+        if last_fp == new_fp:
+            return
+        owner = os.environ.get("OWNER_EMAIL")
+        if not owner:
+            return
+        emailer.send(
+            to=owner,
+            subject="sfjuryalert.com — court page structure changed",
+            text=emailer.structure_change_body(last_fp, new_fp),
+            html_body=emailer.structure_change_html(last_fp, new_fp),
+        )
+    except Exception:  # noqa: BLE001
+        log.exception("structure-change alert failed")
 
 
 def _notify_subscription(

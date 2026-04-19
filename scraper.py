@@ -6,6 +6,7 @@ Standby and already-reported blocks are intentionally ignored.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -90,6 +91,38 @@ def _parse_groups(s: str) -> tuple[int, ...]:
         if part.isdigit():
             out.append(int(part))
     return tuple(out)
+
+
+_DAY_RE = re.compile(
+    r"\b(Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday)\b", re.I
+)
+_MONTH_RE = re.compile(
+    r"\b(January|February|March|April|May|June|July|August|September|October|November|December)\b",
+    re.I,
+)
+
+
+def structural_fingerprint(html: str) -> str:
+    """Hash of the report-block structure, insensitive to day-to-day content
+    changes (dates, group numbers, day/month names).
+
+    Used to alert when the court page's HTML scheme changes in a way that
+    could break parsing — without spamming on routine content updates.
+    """
+    soup = BeautifulSoup(html, "html.parser")
+    blocks = soup.select("blockquote.blockquote--alert--success")
+    if not blocks:
+        return hashlib.sha256(b"NO_ALERT_BLOCKS").hexdigest()[:16]
+
+    parts = []
+    for bq in blocks:
+        text = bq.get_text(" ", strip=True)
+        text = re.sub(r"\d+", "#", text)
+        text = _DAY_RE.sub("DAY", text)
+        text = _MONTH_RE.sub("MONTH", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        parts.append(text)
+    return hashlib.sha256("||".join(parts).encode()).hexdigest()[:16]
 
 
 def _parse_date(s: str) -> date | None:

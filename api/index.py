@@ -56,6 +56,7 @@ def index():
         "form.html", form={}, message=None, error=None,
         today=date.today().isoformat(),
         feedback_email=os.environ.get("FEEDBACK_EMAIL", "info@sfjuryalert.com"),
+        last_check=_last_check_display(),
     )
 
 
@@ -74,6 +75,7 @@ def subscribe():
             "form.html", form=form, error=error, message=None,
             today=date.today().isoformat(),
             feedback_email=os.environ.get("FEEDBACK_EMAIL", "info@sfjuryalert.com"),
+            last_check=_last_check_display(),
         )
 
     sub_id = db.add_subscription(
@@ -102,6 +104,7 @@ def subscribe():
         ),
         today=date.today().isoformat(),
         feedback_email=os.environ.get("FEEDBACK_EMAIL", "info@sfjuryalert.com"),
+        last_check=_last_check_display(),
     )
 
 
@@ -165,6 +168,31 @@ def _require_cron_auth() -> None:
     provided = header[7:] if header.startswith("Bearer ") else header
     if provided != expected:
         abort(401)
+
+
+def _last_check_display() -> dict | None:
+    """Return a small dict the template can render as a social-proof
+    status line. Never raises — returns None if the DB is unreachable
+    or has no scrape rows yet."""
+    try:
+        row = db.last_scrape_info()
+    except Exception:  # noqa: BLE001
+        return None
+    if not row:
+        return None
+    ran_at = row["ran_at"].astimezone(PACIFIC)
+    today_pt = datetime.now(PACIFIC).date()
+    if ran_at.date() == today_pt:
+        day = "today"
+    elif ran_at.date() == today_pt - timedelta(days=1):
+        day = "yesterday"
+    else:
+        day = ran_at.strftime("%B %d")
+    time = ran_at.strftime("%-I:%M%p").lower()
+    return {
+        "label": f"Last check: {day} at {time} PT",
+        "ok": row["status"] == "ok",
+    }
 
 
 def _validate(form: dict) -> str | None:

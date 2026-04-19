@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <title>SF Jury Duty Alerts — Free Email Notifications for San Francisco Jurors</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href='data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><rect width="32" height="32" fill="%231aa692"/><text x="16" y="23" text-anchor="middle" font-family="ui-sans-serif,-apple-system,sans-serif" font-size="20" font-weight="700" fill="white">J</text></svg>'>
 <meta name="description" content="Free email notifications for San Francisco jury duty. Enter your jury group number and week of service — we watch the Superior Court reporting page every court day and email you if your group is called.">
 <meta name="keywords" content="San Francisco jury duty, SF jury duty, jury duty notifications, jury reporting alerts, SF Superior Court, jury group number, jury duty email reminder, San Francisco juror, jury reporting instructions, sfjuryalert">
 <meta name="robots" content="index, follow">
@@ -39,6 +40,7 @@
 <style>
   :root {
     --teal: #1aa692;
+    --teal-link: #0f7a6a;  /* darker for AA contrast on white */
     --navy: #1f2a3c;
     --ink: #1a2432;
     --muted: #6a7381;
@@ -46,6 +48,11 @@
     --tile-blue: #e7eff6;
     --tile-green: #e9f3ec;
     --bg: #ffffff;
+  }
+  a { color: var(--teal-link); }
+  a:focus-visible, button:focus-visible {
+    outline: 2px solid var(--teal);
+    outline-offset: 2px;
   }
   * { box-sizing: border-box; }
   body {
@@ -200,10 +207,51 @@
     line-height: 1.5;
   }
   .success-sub {
-    margin: 0;
+    margin: 0 0 1.25rem;
     color: var(--muted);
     font-size: 0.95rem;
   }
+  .success-check {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: var(--teal);
+    color: white;
+    display: flex; align-items: center; justify-content: center;
+    margin-bottom: 1rem;
+    font-size: 1.4rem; font-weight: 700;
+  }
+  .success-action a {
+    font-size: 0.8rem;
+    letter-spacing: 0.22em;
+    font-weight: 600;
+    text-transform: uppercase;
+    color: var(--teal-link);
+    text-decoration: underline;
+  }
+
+  .field-hint {
+    margin-top: 0.45rem;
+    font-size: 0.8rem;
+    color: var(--muted);
+  }
+
+  .check-status {
+    margin: 1.5rem 0 0;
+    text-align: center;
+    font-size: 0.78rem;
+    letter-spacing: 0.18em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .check-status .dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--teal);
+    margin-right: 0.5rem;
+    vertical-align: middle;
+  }
+  .check-status.warn .dot { background: #c0443b; }
 
   .footer {
     display: grid;
@@ -242,10 +290,11 @@
 <div class="wrap">
 
   <div class="header">
-    <span class="eyebrow">SAN FRANCISCO</span>
-    <h1 class="title">JURY DUTY<br>MONITORING SERVICE</h1>
+    <span class="eyebrow">SAN FRANCISCO JURY DUTY</span>
+    <h1 class="title">Never miss a call to report.</h1>
     <div class="rule-short"></div>
-    <p class="lede">A completely free service created by a SF resident.</p>
+    <p class="lede">A completely free email notification service for SF
+      jurors.</p>
   </div>
   <div class="rule-teal"></div>
 
@@ -253,15 +302,15 @@
     <div class="step">
       <div class="num">01</div>
       <div class="label">REGISTER</div>
-      <p class="desc">Provide your jury group number and week of service dates.</p>
+      <p class="desc">Enter the jury group number and week of service
+        listed on your summons.</p>
     </div>
     <div class="step">
       <div class="num">02</div>
       <div class="label">MONITOR</div>
       <p class="desc">System checks the
         <a href="https://sf.courts.ca.gov/divisions/jury-reporting-instructions"
-           target="_blank" rel="noopener"
-           style="color: var(--teal); text-decoration: underline;">Superior
+           target="_blank" rel="noopener">Superior
         Court website</a> every court day at 4:30pm.</p>
     </div>
     <div class="step">
@@ -277,9 +326,13 @@
   <section class="card card--success">
     <div class="card-head">REGISTRATION CONFIRMED</div>
     <div class="card-body">
+      <div class="success-check" aria-hidden="true">✓</div>
       <p class="success-text">{{ message }}</p>
       <p class="success-sub">You can close this page. We'll email you if
       your group is called during your week of service.</p>
+      <p class="success-action">
+        <a href="/">Register another week</a>
+      </p>
     </div>
   </section>
   {% else %}
@@ -301,11 +354,18 @@
           <span class="field-label">EMAIL ADDRESS</span>
           <input type="email" name="email" placeholder="name@domain.com"
                  required value="{{ form.email or '' }}">
+          <p class="field-hint">Used only for this notification.</p>
         </label>
         <button class="btn" type="submit">REGISTER FOR NOTIFICATIONS</button>
       </form>
     </div>
   </section>
+  {% endif %}
+
+  {% if last_check %}
+  <p class="check-status {{ '' if last_check.ok else 'warn' }}">
+    <span class="dot"></span>{{ last_check.label }}
+  </p>
   {% endif %}
 
   <footer class="footer">
@@ -323,12 +383,13 @@
       channels.</p>
     </div>
     <div style="grid-column: 1 / -1; margin-top: 0.5rem;">
-      <h4>FEEDBACK</h4>
+      <h4>FEEDBACK & SOURCE</h4>
       <p>Questions or suggestions?
-        <a href="mailto:{{ feedback_email }}?subject=sfjuryalert.com%20feedback"
-           style="color: var(--teal); text-decoration: underline;">
-          Send us a note
-        </a>.
+        <a href="mailto:{{ feedback_email }}?subject=sfjuryalert.com%20feedback">
+          Send a note
+        </a>. The source code is public on
+        <a href="https://github.com/florasarder/sfjuryalert"
+           target="_blank" rel="noopener">GitHub</a>.
       </p>
     </div>
   </footer>

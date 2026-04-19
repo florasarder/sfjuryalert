@@ -83,13 +83,37 @@ def record_notification(subscription_id: int, court_day: date) -> None:
 
 
 def log_scrape(
-    status: str, blocks: Optional[int] = None, error: Optional[str] = None
+    status: str,
+    blocks: Optional[int] = None,
+    error: Optional[str] = None,
+    page_fingerprint: Optional[str] = None,
 ) -> None:
     with connect() as conn:
         conn.execute(
-            "INSERT INTO scrape_log (status, blocks, error) VALUES (%s, %s, %s)",
-            (status, blocks, error),
+            "INSERT INTO scrape_log (status, blocks, error, page_fingerprint) "
+            "VALUES (%s, %s, %s, %s)",
+            (status, blocks, error, page_fingerprint),
         )
+
+
+def last_page_fingerprint() -> Optional[str]:
+    """Most recent non-null fingerprint, or None if never recorded."""
+    with connect() as conn:
+        row = conn.execute(
+            "SELECT page_fingerprint FROM scrape_log "
+            "WHERE page_fingerprint IS NOT NULL "
+            "ORDER BY ran_at DESC LIMIT 1"
+        ).fetchone()
+        return row["page_fingerprint"] if row else None
+
+
+def last_scrape_info() -> Optional[dict]:
+    """Most recent scrape (any status). Used for the UI status line."""
+    with connect() as conn:
+        return conn.execute(
+            "SELECT ran_at, status, blocks FROM scrape_log "
+            "ORDER BY ran_at DESC LIMIT 1"
+        ).fetchone()
 
 
 def delete_expired(cutoff_iso: str) -> int:
