@@ -3,7 +3,7 @@
     { "source": "/(.*)", "destination": "/api/index" }
   ],
   "crons": [
-    { "path": "/api/scrape",  "schedule": "30 0 * * *" },
-    { "path": "/api/cleanup", "schedule": "0 11 * * *" }
+    { "path": "/api/scrape",          "schedule": "30 0 * * *" },
+    { "path": "/api/weekly-summary",  "schedule": "0 14 * * 1" }
   ]
 }

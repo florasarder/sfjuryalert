@@ -51,9 +51,11 @@ limiter = Limiter(
 
 @app.route("/", methods=["GET"])
 def index():
+    db.log_event("page_view")
     return render_template(
         "form.html", form={}, message=None, error=None,
         today=date.today().isoformat(),
+        feedback_email=os.environ.get("FEEDBACK_EMAIL", "info@sfjuryalert.com"),
     )
 
 
@@ -71,6 +73,7 @@ def subscribe():
         return render_template(
             "form.html", form=form, error=error, message=None,
             today=date.today().isoformat(),
+            feedback_email=os.environ.get("FEEDBACK_EMAIL", "info@sfjuryalert.com"),
         )
 
     sub_id = db.add_subscription(
@@ -78,6 +81,7 @@ def subscribe():
         group_number=int(form["group_number"]),
         week_start=form["week_start"],
     )
+    db.log_event("registration")
 
     emailer.send(
         to=form["email"],
@@ -97,21 +101,50 @@ def subscribe():
             f"{form['group_number']} is called."
         ),
         today=date.today().isoformat(),
+        feedback_email=os.environ.get("FEEDBACK_EMAIL", "info@sfjuryalert.com"),
     )
 
 
 @app.route("/api/scrape", methods=["GET", "POST"])
 def cron_scrape():
+    """Daily cron: run scrape + notify, then clean up expired subscriptions.
+
+    Cleanup is consolidated here so we stay within Vercel Hobby's 2-cron cap
+    (scrape + weekly summary).
+    """
     _require_cron_auth()
     sent = notifier.run_all()
-    return jsonify({"sent": sent}), 200
-
-
-@app.route("/api/cleanup", methods=["GET", "POST"])
-def cron_cleanup():
-    _require_cron_auth()
     deleted = db.delete_expired(date.today().isoformat())
-    return jsonify({"deleted": deleted}), 200
+    return jsonify({"sent": sent, "deleted": deleted}), 200
+
+
+@app.route("/api/weekly-summary", methods=["GET", "POST"])
+def cron_weekly_summary():
+    """Email the owner a usage summary (this week + all time)."""
+    _require_cron_auth()
+    owner = os.environ.get("OWNER_EMAIL")
+    if not owner:
+        return jsonify({"error": "OWNER_EMAIL not set"}), 500
+
+    counts = db.event_counts(["page_view", "registration", "notification"])
+    # Emails sent = confirmations (= registrations) + notifications
+    emails_week = counts["registration"]["week"] + counts["notification"]["week"]
+    emails_all = counts["registration"]["all_time"] + counts["notification"]["all_time"]
+
+    summary = {
+        "views": counts["page_view"],
+        "registrations": counts["registration"],
+        "emails_sent": {"week": emails_week, "all_time": emails_all},
+        "notifications": counts["notification"],
+    }
+
+    emailer.send(
+        to=owner,
+        subject="sfjuryalert.com — weekly summary",
+        text=emailer.summary_body(summary),
+        html_body=emailer.summary_html(summary),
+    )
+    return jsonify({"sent_to": owner, "summary": summary}), 200
 
 
 @app.route("/api/init", methods=["GET", "POST"])

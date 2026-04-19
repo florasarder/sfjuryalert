@@ -29,6 +29,8 @@ See `PROJECT.md` for the full spec.
 | `SMTP_FROM` | From address, e.g. `jury@yourdomain.com` |
 | `CRON_SECRET` | Random token; Vercel Cron sends it as `Authorization: Bearer ...` |
 | `JURY_ENV` | Set to `production` to block email printing on dev-mode misconfig |
+| `OWNER_EMAIL` | Recipient for the weekly usage summary email (Mondays 14:00 UTC) |
+| `FEEDBACK_EMAIL` | Address rendered in the "Send us a note" mailto link on the form |
 
 ## Local development
 
@@ -61,9 +63,12 @@ Tests:
    with `Authorization: Bearer $CRON_SECRET` to create the schema.
    (Or run `db.init_db()` locally against your Neon URL.)
 
-Vercel Cron will hit `/api/scrape` daily at **00:30 UTC** (= 4:30pm PST or
-5:30pm PDT — always after the court updates the page) and `/api/cleanup`
-at 11:00 UTC.
+Vercel Cron will hit:
+- `/api/scrape` daily at **00:30 UTC** (= 4:30pm PST / 5:30pm PDT — always
+  after the court updates the page). This endpoint also deletes expired
+  subscriptions, consolidated to stay within Vercel Hobby's 2-cron limit.
+- `/api/weekly-summary` Mondays at **14:00 UTC** (= 6am/7am PT) to email
+  `OWNER_EMAIL` a usage summary (this week + all-time).
 
 ### Note on cron and DST
 

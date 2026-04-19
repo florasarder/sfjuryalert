@@ -144,6 +144,79 @@ def confirmation_html(group_number: int, week_start: str) -> str:
     return _wrap("SF JURY DUTY · REGISTRATION CONFIRMED", body)
 
 
+# --- Weekly summary (owner) ------------------------------------------------
+
+
+def summary_body(summary: dict) -> str:
+    def row(label: str, d: dict) -> str:
+        return f"{label:<22} week: {d['week']:<5}  all-time: {d['all_time']}"
+
+    return (
+        "sfjuryalert.com weekly summary\n\n"
+        + row("Site views", summary["views"]) + "\n"
+        + row("Registrations", summary["registrations"]) + "\n"
+        + row("Emails sent", summary["emails_sent"]) + "\n"
+        + row("Notifications (calls)", summary["notifications"]) + "\n"
+    )
+
+
+def summary_html(summary: dict) -> str:
+    header = f"""
+      <tr>
+        <th style="padding:12px 16px; border:1px solid {_BORDER}; background:{_TILE_BG};
+                   text-align:left; font-size:11px; letter-spacing:.2em; color:{_MUTED};
+                   text-transform:uppercase; font-weight:600;">Metric</th>
+        <th style="padding:12px 16px; border:1px solid {_BORDER}; background:{_TILE_BG};
+                   text-align:right; font-size:11px; letter-spacing:.2em; color:{_MUTED};
+                   text-transform:uppercase; font-weight:600; width:22%;">This week</th>
+        <th style="padding:12px 16px; border:1px solid {_BORDER}; background:{_TILE_BG};
+                   text-align:right; font-size:11px; letter-spacing:.2em; color:{_MUTED};
+                   text-transform:uppercase; font-weight:600; width:22%;">All time</th>
+      </tr>
+    """
+
+    def row(label: str, d: dict) -> str:
+        return f"""
+          <tr>
+            <td style="padding:14px 16px; border:1px solid {_BORDER};
+                       font-size:15px; color:{_INK};">{html.escape(label)}</td>
+            <td style="padding:14px 16px; border:1px solid {_BORDER};
+                       font-size:18px; color:{_INK}; text-align:right; font-variant-numeric:tabular-nums;">
+              {d['week']}
+            </td>
+            <td style="padding:14px 16px; border:1px solid {_BORDER};
+                       font-size:18px; color:{_MUTED}; text-align:right; font-variant-numeric:tabular-nums;">
+              {d['all_time']}
+            </td>
+          </tr>
+        """
+
+    table = (
+        f'<table role="presentation" cellpadding="0" cellspacing="0" border="0" '
+        f'style="width:100%; border-collapse:collapse; margin:8px 0 0;">'
+        + header
+        + row("Site views", summary["views"])
+        + row("Registrations", summary["registrations"])
+        + row("Emails sent", summary["emails_sent"])
+        + row("Notifications (groups called)", summary["notifications"])
+        + "</table>"
+    )
+
+    body = f"""
+      <tr><td style="padding:0 32px;">
+        <p style="margin:0 0 8px; font-size:13px; letter-spacing:.22em; color:{_MUTED}; text-transform:uppercase;">Weekly summary</p>
+        <h1 style="margin:0 0 20px; font-size:22px; line-height:1.25; color:{_INK}; font-weight:700;">
+          sfjuryalert.com usage
+        </h1>
+        <p style="margin:0 0 20px; font-size:15px; line-height:1.55; color:{_INK};">
+          Counts for the last 7 days alongside the all-time totals.
+        </p>
+        {table}
+      </td></tr>
+    """
+    return _wrap("SF JURY DUTY · WEEKLY SUMMARY", body)
+
+
 # --- Shared layout ---------------------------------------------------------
 
 

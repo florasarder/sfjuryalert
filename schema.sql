@@ -22,3 +22,13 @@ CREATE TABLE IF NOT EXISTS scrape_log (
   blocks  INTEGER,
   error   TEXT
 );
+
+-- Privacy-safe activity log. No PII stored. Never deleted so we can show
+-- all-time counts in the weekly summary email.
+CREATE TABLE IF NOT EXISTS events (
+  id           SERIAL PRIMARY KEY,
+  type         TEXT NOT NULL,      -- 'page_view' | 'registration' | 'notification'
+  occurred_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_events_type_time ON events(type, occurred_at);

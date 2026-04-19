@@ -105,5 +105,6 @@ def _notify_subscription(
             ),
         )
         db.record_notification(sub_id, block.court_day)
+        db.log_event("notification")
         sent += 1
     return sent

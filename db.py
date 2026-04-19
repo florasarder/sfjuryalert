@@ -102,3 +102,33 @@ def delete_expired(cutoff_iso: str) -> int:
             (cutoff_iso,),
         )
         return result.rowcount or 0
+
+
+def log_event(event_type: str) -> None:
+    """Record a privacy-safe activity event. Best-effort — swallows errors."""
+    try:
+        with connect() as conn:
+            conn.execute("INSERT INTO events (type) VALUES (%s)", (event_type,))
+    except Exception:  # noqa: BLE001
+        pass  # never let analytics take down the request
+
+
+def event_counts(types: list[str]) -> dict[str, dict[str, int]]:
+    """Return {type: {'week': N, 'all_time': N}} for each requested type."""
+    out: dict[str, dict[str, int]] = {t: {"week": 0, "all_time": 0} for t in types}
+    with connect() as conn:
+        rows = conn.execute(
+            """
+            SELECT type,
+                   COUNT(*) FILTER (WHERE occurred_at >= NOW() - INTERVAL '7 days')
+                     AS week,
+                   COUNT(*) AS all_time
+            FROM events
+            WHERE type = ANY(%s)
+            GROUP BY type
+            """,
+            (types,),
+        ).fetchall()
+    for row in rows:
+        out[row["type"]] = {"week": int(row["week"]), "all_time": int(row["all_time"])}
+    return out
