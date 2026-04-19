@@ -1,0 +1,237 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>SF Jury Duty Monitoring Service</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --teal: #1aa692;
+    --navy: #1f2a3c;
+    --ink: #1a2432;
+    --muted: #6a7381;
+    --border: #d8dde3;
+    --tile-blue: #e7eff6;
+    --tile-green: #e9f3ec;
+    --bg: #ffffff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    font-family: ui-sans-serif, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--ink);
+    background: var(--bg);
+    line-height: 1.5;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 3.5rem 1.5rem 4rem; }
+
+  .eyebrow {
+    display: inline-block;
+    border: 1.5px solid var(--ink);
+    padding: 0.55rem 1.6rem;
+    letter-spacing: 0.25em;
+    font-size: 0.85rem;
+    font-weight: 500;
+  }
+  .header { text-align: center; }
+  .title {
+    font-size: clamp(1.9rem, 4.5vw, 2.6rem);
+    font-weight: 700;
+    margin: 1.5rem 0 1rem;
+    letter-spacing: 0.02em;
+    line-height: 1.15;
+  }
+  .rule-short {
+    width: 48px; height: 2px; background: var(--ink);
+    margin: 1.2rem auto 0;
+  }
+  .rule-teal {
+    height: 5px; background: var(--teal);
+    margin: 2.5rem 0 3rem;
+  }
+
+  .steps {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 1.25rem;
+    margin-bottom: 3rem;
+  }
+  .step {
+    border: 1px solid var(--border);
+    padding: 1.5rem 1.5rem 1.75rem;
+    background: var(--tile-blue);
+  }
+  .step:last-child { background: var(--tile-green); }
+  .step .num {
+    font-size: 2.1rem; font-weight: 400; letter-spacing: 0.02em;
+    color: var(--ink);
+  }
+  .step .label {
+    margin-top: 1rem;
+    font-size: 0.9rem; font-weight: 600;
+    letter-spacing: 0.22em;
+  }
+  .step .desc {
+    margin-top: 0.6rem; color: var(--muted); font-size: 0.95rem;
+  }
+
+  .card {
+    border: 1px solid var(--border);
+    margin-top: 1rem;
+  }
+  .card-head {
+    background: var(--teal);
+    color: white;
+    padding: 1rem 1.5rem;
+    letter-spacing: 0.22em;
+    font-size: 0.95rem;
+    font-weight: 600;
+  }
+  .card-body { padding: 1.75rem 1.5rem 2rem; }
+
+  .field { display: block; margin-bottom: 1.3rem; }
+  .field-label {
+    display: block;
+    font-size: 0.8rem;
+    letter-spacing: 0.2em;
+    color: var(--muted);
+    margin-bottom: 0.55rem;
+    font-weight: 500;
+  }
+  .field input {
+    width: 100%;
+    padding: 0.95rem 1rem;
+    font-size: 1rem;
+    font-family: ui-monospace, "SF Mono", Menlo, monospace;
+    border: 1px solid var(--border);
+    background: #fafbfc;
+    color: var(--ink);
+    border-radius: 0;
+  }
+  .field input:focus { outline: 2px solid var(--teal); outline-offset: -1px; border-color: var(--teal); }
+  .field input[type="number"]::-webkit-outer-spin-button,
+  .field input[type="number"]::-webkit-inner-spin-button {
+    -webkit-appearance: none; margin: 0;
+  }
+  .field input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+
+  .btn {
+    display: block; width: 100%;
+    padding: 1.1rem;
+    background: var(--navy);
+    color: white;
+    border: 0;
+    font-size: 0.95rem;
+    letter-spacing: 0.25em;
+    font-weight: 600;
+    cursor: pointer;
+    margin-top: 0.5rem;
+  }
+  .btn:hover { background: #162033; }
+
+  .footer {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 2rem;
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    color: var(--muted);
+    font-size: 0.9rem;
+  }
+  .footer h4 {
+    margin: 0 0 0.55rem;
+    color: var(--ink);
+    font-size: 0.8rem;
+    letter-spacing: 0.22em;
+    font-weight: 600;
+  }
+
+  .alert {
+    padding: 0.9rem 1rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid var(--border);
+    font-size: 0.95rem;
+  }
+  .alert.ok { border-color: var(--teal); background: #edf8f5; color: #0d5f53; }
+  .alert.err { border-color: #c0443b; background: #fbeeec; color: #8a2e27; }
+
+  @media (max-width: 700px) {
+    .steps { grid-template-columns: 1fr; }
+    .footer { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="header">
+    <span class="eyebrow">SAN FRANCISCO</span>
+    <h1 class="title">JURY DUTY<br>MONITORING SERVICE</h1>
+    <div class="rule-short"></div>
+  </div>
+  <div class="rule-teal"></div>
+
+  <section class="steps" aria-label="How it works">
+    <div class="step">
+      <div class="num">01</div>
+      <div class="label">REGISTER</div>
+      <p class="desc">Provide your jury group number and week of service dates.</p>
+    </div>
+    <div class="step">
+      <div class="num">02</div>
+      <div class="label">MONITOR</div>
+      <p class="desc">System checks Superior Court website every court day at 4:30pm.</p>
+    </div>
+    <div class="step">
+      <div class="num">03</div>
+      <div class="label">NOTIFY</div>
+      <p class="desc">Receive email notification when your group is called.</p>
+    </div>
+  </section>
+
+  {% if message %}<div class="alert ok">{{ message }}</div>{% endif %}
+  {% if error %}<div class="alert err">{{ error }}</div>{% endif %}
+
+  <section class="card">
+    <div class="card-head">REGISTRATION FORM</div>
+    <div class="card-body">
+      <form method="post" action="/subscribe">
+        <label class="field">
+          <span class="field-label">JURY GROUP NUMBER</span>
+          <input type="number" name="group_number" min="1" placeholder="000"
+                 required value="{{ form.group_number or '' }}">
+        </label>
+        <label class="field">
+          <span class="field-label">WEEK OF SERVICE</span>
+          <input type="date" name="week_start" min="{{ today }}"
+                 required value="{{ form.week_start or '' }}">
+        </label>
+        <label class="field">
+          <span class="field-label">EMAIL ADDRESS</span>
+          <input type="email" name="email" placeholder="name@domain.com"
+                 required value="{{ form.email or '' }}">
+        </label>
+        <button class="btn" type="submit">SUBMIT REGISTRATION</button>
+      </form>
+    </div>
+  </section>
+
+  <footer class="footer">
+    <div>
+      <h4>NOTICE</h4>
+      <p>This automated monitoring service is provided independently. Data
+      submitted is used exclusively for notification purposes and is not
+      shared with third parties.</p>
+    </div>
+    <div>
+      <h4>DISCLAIMER</h4>
+      <p>This service is not affiliated with or endorsed by the San Francisco
+      Superior Court. Always verify reporting requirements through official
+      channels.</p>
+    </div>
+  </footer>
+
+</div>
+</body>
+</html>

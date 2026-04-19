@@ -1,0 +1,213 @@
+"""Send notification emails via SMTP, with HTML + plain-text alternatives.
+
+Configure via env vars:
+  SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, SMTP_FROM
+
+For Resend: SMTP_HOST=smtp.resend.com SMTP_PORT=465 SMTP_USER=resend SMTP_PASSWORD=<api_key>
+For Gmail app password: SMTP_HOST=smtp.gmail.com SMTP_PORT=465 SMTP_USER=<you> SMTP_PASSWORD=<app_pw>
+
+If SMTP_HOST is unset (dev), emails are written to stdout. Production refuses.
+"""
+
+from __future__ import annotations
+
+import html
+import os
+import smtplib
+import ssl
+from email.message import EmailMessage
+
+
+# Palette matches templates/form.html
+_TEAL = "#1aa692"
+_NAVY = "#1f2a3c"
+_INK = "#1a2432"
+_MUTED = "#6a7381"
+_BORDER = "#d8dde3"
+_TILE_BG = "#f7f9fb"
+
+
+def send(to: str, subject: str, text: str, html_body: str | None = None) -> None:
+    host = os.environ.get("SMTP_HOST")
+    if not host:
+        if os.environ.get("JURY_ENV") == "production":
+            raise RuntimeError(
+                "SMTP_HOST is not set but JURY_ENV=production. Refusing to "
+                "print emails to stdout in production (would leak PII to logs)."
+            )
+        print(f"[DEV EMAIL] To: {to}\nSubject: {subject}\n\n{text}\n")
+        return
+
+    port = int(os.environ.get("SMTP_PORT", "465"))
+    user = os.environ["SMTP_USER"]
+    password = os.environ["SMTP_PASSWORD"]
+    sender = os.environ.get("SMTP_FROM", user)
+
+    msg = EmailMessage()
+    msg["From"] = sender
+    msg["To"] = to
+    msg["Subject"] = subject
+    msg.set_content(text)
+    if html_body:
+        msg.add_alternative(html_body, subtype="html")
+
+    ctx = ssl.create_default_context()
+    with smtplib.SMTP_SSL(host, port, context=ctx) as s:
+        s.login(user, password)
+        s.send_message(msg)
+
+
+# --- Notification (group called) -------------------------------------------
+
+
+def notification_body(
+    group_number: int, court_day: str, time_text: str, location: str
+) -> str:
+    return (
+        f"Your SF jury duty group ({group_number}) has been called to report.\n\n"
+        f"Date: {court_day}\n"
+        f"Time: {time_text}\n"
+        f"Location: {location}\n\n"
+        f"Source: https://sf.courts.ca.gov/divisions/jury-reporting-instructions\n"
+    )
+
+
+def notification_html(
+    group_number: int, court_day: str, time_text: str, location: str
+) -> str:
+    rows = _details_rows(
+        [
+            ("GROUP NUMBER", str(group_number)),
+            ("DATE", court_day),
+            ("TIME", time_text),
+            ("LOCATION", location),
+        ]
+    )
+    body = f"""
+      <tr><td style="padding:0 32px;">
+        <p style="margin:0 0 8px; font-size:13px; letter-spacing:.22em; color:{_MUTED}; text-transform:uppercase;">You have been called</p>
+        <h1 style="margin:0 0 20px; font-size:22px; line-height:1.25; color:{_INK}; font-weight:700;">
+          Your jury duty group has been called to report.
+        </h1>
+        <p style="margin:0 0 24px; font-size:15px; line-height:1.55; color:{_INK};">
+          Please review the reporting details below and plan to arrive on time.
+        </p>
+        {rows}
+        <p style="margin:28px 0 0; font-size:13px; color:{_MUTED};">
+          Always verify on the
+          <a href="https://sf.courts.ca.gov/divisions/jury-reporting-instructions"
+             style="color:{_TEAL}; text-decoration:underline;">
+            official court page
+          </a>
+          before traveling.
+        </p>
+      </td></tr>
+    """
+    return _wrap("SF JURY DUTY · REPORTING NOTICE", body)
+
+
+# --- Confirmation (signup) --------------------------------------------------
+
+
+def confirmation_body(group_number: int, week_start: str) -> str:
+    return (
+        "You're signed up for SF jury duty reporting notifications.\n\n"
+        f"Group number: {group_number}\n"
+        f"Week of service: {week_start}\n\n"
+        "We'll check the SF court page every court day at 4:30pm PST from the\n"
+        "Friday before your week through Thursday of your week. If your group\n"
+        "is called, you'll receive an email with the date, time, and location.\n"
+    )
+
+
+def confirmation_html(group_number: int, week_start: str) -> str:
+    rows = _details_rows(
+        [
+            ("GROUP NUMBER", str(group_number)),
+            ("WEEK OF SERVICE", week_start),
+        ]
+    )
+    body = f"""
+      <tr><td style="padding:0 32px;">
+        <p style="margin:0 0 8px; font-size:13px; letter-spacing:.22em; color:{_MUTED}; text-transform:uppercase;">Registration confirmed</p>
+        <h1 style="margin:0 0 20px; font-size:22px; line-height:1.25; color:{_INK}; font-weight:700;">
+          You're signed up for jury duty notifications.
+        </h1>
+        <p style="margin:0 0 24px; font-size:15px; line-height:1.55; color:{_INK};">
+          We'll check the Superior Court website every court day at 4:30pm PST,
+          from the Friday before your week through Thursday of your week. If
+          your group is called, we'll email you the date, time, and location.
+        </p>
+        {rows}
+      </td></tr>
+    """
+    return _wrap("SF JURY DUTY · REGISTRATION CONFIRMED", body)
+
+
+# --- Shared layout ---------------------------------------------------------
+
+
+def _details_rows(pairs: list[tuple[str, str]]) -> str:
+    cells = []
+    for label, value in pairs:
+        cells.append(
+            f"""
+            <tr>
+              <td style="padding:14px 16px; border:1px solid {_BORDER}; background:{_TILE_BG};
+                         width:40%; font-size:11px; letter-spacing:.22em;
+                         color:{_MUTED}; text-transform:uppercase; vertical-align:top;">
+                {html.escape(label)}
+              </td>
+              <td style="padding:14px 16px; border:1px solid {_BORDER};
+                         font-size:15px; color:{_INK}; vertical-align:top;">
+                {html.escape(value)}
+              </td>
+            </tr>
+            """
+        )
+    return (
+        f'<table role="presentation" cellpadding="0" cellspacing="0" border="0" '
+        f'style="width:100%; border-collapse:collapse; margin:8px 0 0;">'
+        + "".join(cells)
+        + "</table>"
+    )
+
+
+def _wrap(header_text: str, inner_rows: str) -> str:
+    return f"""<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SF Jury Duty</title>
+</head>
+<body style="margin:0; padding:0; background:#f3f5f8;
+             font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+             color:{_INK};">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0"
+         width="100%" style="background:#f3f5f8; padding:32px 12px;">
+    <tr><td align="center">
+      <table role="presentation" cellpadding="0" cellspacing="0" border="0"
+             width="600" style="max-width:600px; width:100%; background:#ffffff;
+                                 border:1px solid {_BORDER};">
+        <tr>
+          <td style="background:{_TEAL}; color:#ffffff; padding:18px 32px;
+                     letter-spacing:.25em; font-size:13px; font-weight:600;">
+            {html.escape(header_text)}
+          </td>
+        </tr>
+        <tr><td style="height:28px; line-height:28px;">&nbsp;</td></tr>
+        {inner_rows}
+        <tr><td style="height:28px; line-height:28px;">&nbsp;</td></tr>
+        <tr>
+          <td style="background:{_NAVY}; color:#c9d1dc; padding:18px 32px;
+                     font-size:12px; line-height:1.5;">
+            This service is not affiliated with the San Francisco Superior Court.
+            Always verify reporting requirements through official channels.
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>"""
