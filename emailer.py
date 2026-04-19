@@ -68,8 +68,7 @@ def notification_body(
         f"Date: {court_day}\n"
         f"Time: {time_text}\n"
         f"Location: {location}\n\n"
-        f"Source: https://sf.courts.ca.gov/divisions/jury-reporting-instructions\n\n"
-        f"Please do not reply to this email — this inbox is not monitored.\n"
+        f"Source: https://sf.courts.ca.gov/divisions/jury-reporting-instructions\n"
     )
 
 
@@ -102,9 +101,6 @@ def notification_html(
           </a>
           before traveling.
         </p>
-        <p style="margin:14px 0 0; font-size:12px; color:{_MUTED};">
-          Please do not reply to this email — this inbox is not monitored.
-        </p>
       </td></tr>
     """
     return _wrap("SF JURY DUTY · REPORTING NOTICE", body)
@@ -120,8 +116,7 @@ def confirmation_body(group_number: int, week_start: str) -> str:
         f"Week of service: {week_start}\n\n"
         "We'll check the SF court page every court day at 4:30pm PST from the\n"
         "Friday before your week through Thursday of your week. If your group\n"
-        "is called, you'll receive an email with the date, time, and location.\n\n"
-        "Please do not reply to this email — this inbox is not monitored.\n"
+        "is called, you'll receive an email with the date, time, and location.\n"
     )
 
 
@@ -144,9 +139,6 @@ def confirmation_html(group_number: int, week_start: str) -> str:
           your group is called, we'll email you the date, time, and location.
         </p>
         {rows}
-        <p style="margin:20px 0 0; font-size:12px; color:{_MUTED};">
-          Please do not reply to this email — this inbox is not monitored.
-        </p>
       </td></tr>
     """
     return _wrap("SF JURY DUTY · REGISTRATION CONFIRMED", body)
