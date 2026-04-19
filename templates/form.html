@@ -87,6 +87,12 @@
   .rule-teal {
     height: 5px; background: var(--teal);
     margin: 2.5rem 0 3rem;
+    transform: scaleX(0);
+    transform-origin: left center;
+    animation: rule-in 0.9s cubic-bezier(0.22, 0.61, 0.36, 1) 0.1s forwards;
+  }
+  @keyframes rule-in {
+    to { transform: scaleX(1); }
   }
 
   .steps {
@@ -99,8 +105,26 @@
     border: 1px solid var(--border);
     padding: 1.5rem 1.5rem 1.75rem;
     background: var(--tile-blue);
+    opacity: 0;
+    transform: translateY(14px);
+    animation: tile-in 0.65s cubic-bezier(0.22, 0.61, 0.36, 1) forwards;
   }
+  .step:nth-child(1) { animation-delay: 0.15s; }
+  .step:nth-child(2) { animation-delay: 0.35s; }
+  .step:nth-child(3) { animation-delay: 0.55s; }
   .step:last-child { background: var(--tile-green); }
+
+  @keyframes tile-in {
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .step, .rule-teal {
+      opacity: 1;
+      transform: none;
+      animation: none;
+    }
+  }
   .step .num {
     font-size: 2.1rem; font-weight: 400; letter-spacing: 0.02em;
     color: var(--ink);
@@ -221,8 +245,7 @@
     <span class="eyebrow">SAN FRANCISCO</span>
     <h1 class="title">JURY DUTY<br>MONITORING SERVICE</h1>
     <div class="rule-short"></div>
-    <p class="lede">A completely free service — and always will be.
-      Built by a San Francisco resident.</p>
+    <p class="lede">A completely free service created by a SF resident.</p>
   </div>
   <div class="rule-teal"></div>
 
