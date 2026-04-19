@@ -2,8 +2,40 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>SF Jury Duty Monitoring Service</title>
+<title>SF Jury Duty Alerts — Free Email Notifications for San Francisco Jurors</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="Free email notifications for San Francisco jury duty. Enter your jury group number and week of service — we watch the Superior Court reporting page every court day and email you if your group is called.">
+<meta name="keywords" content="San Francisco jury duty, SF jury duty, jury duty notifications, jury reporting alerts, SF Superior Court, jury group number, jury duty email reminder, San Francisco juror, jury reporting instructions, sfjuryalert">
+<meta name="robots" content="index, follow">
+<meta name="author" content="sfjuryalert.com">
+<link rel="canonical" href="https://sfjuryalert.com/">
+
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://sfjuryalert.com/">
+<meta property="og:title" content="SF Jury Duty Alerts — Free Email Notifications">
+<meta property="og:description" content="Never miss a jury duty call. Free email notifications for San Francisco jurors — we watch the Superior Court reporting page for you.">
+<meta property="og:site_name" content="sfjuryalert.com">
+
+<meta name="twitter:card" content="summary">
+<meta name="twitter:title" content="SF Jury Duty Alerts — Free Email Notifications">
+<meta name="twitter:description" content="Never miss a jury duty call. Free email notifications for San Francisco jurors.">
+
+<script type="application/ld+json">
+{
+  "@context": "https://schema.org",
+  "@type": "WebApplication",
+  "name": "SF Jury Duty Alerts",
+  "url": "https://sfjuryalert.com/",
+  "description": "Free email notification service for San Francisco jury duty reporting. Monitors the Superior Court reporting page and emails jurors when their group is called.",
+  "applicationCategory": "UtilitiesApplication",
+  "operatingSystem": "Any",
+  "areaServed": {
+    "@type": "City",
+    "name": "San Francisco"
+  },
+  "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" }
+}
+</script>
 <style>
   :root {
     --teal: #1aa692;
@@ -121,13 +153,26 @@
     background: var(--navy);
     color: white;
     border: 0;
-    font-size: 0.95rem;
-    letter-spacing: 0.25em;
+    font-size: 0.9rem;
+    letter-spacing: 0.18em;
     font-weight: 600;
     cursor: pointer;
     margin-top: 0.5rem;
   }
   .btn:hover { background: #162033; }
+
+  .card--success .card-body { background: var(--tile-green); }
+  .success-text {
+    margin: 0 0 0.8rem;
+    font-size: 1.05rem;
+    color: var(--ink);
+    line-height: 1.5;
+  }
+  .success-sub {
+    margin: 0;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
 
   .footer {
     display: grid;
@@ -181,7 +226,11 @@
     <div class="step">
       <div class="num">02</div>
       <div class="label">MONITOR</div>
-      <p class="desc">System checks Superior Court website every court day at 4:30pm.</p>
+      <p class="desc">System checks the
+        <a href="https://sf.courts.ca.gov/divisions/jury-reporting-instructions"
+           target="_blank" rel="noopener"
+           style="color: var(--teal); text-decoration: underline;">Superior
+        Court website</a> every court day at 4:30pm.</p>
     </div>
     <div class="step">
       <div class="num">03</div>
@@ -190,9 +239,18 @@
     </div>
   </section>
 
-  {% if message %}<div class="alert ok">{{ message }}</div>{% endif %}
   {% if error %}<div class="alert err">{{ error }}</div>{% endif %}
 
+  {% if message %}
+  <section class="card card--success">
+    <div class="card-head">REGISTRATION CONFIRMED</div>
+    <div class="card-body">
+      <p class="success-text">{{ message }}</p>
+      <p class="success-sub">You can close this page. We'll email you if
+      your group is called during your week of service.</p>
+    </div>
+  </section>
+  {% else %}
   <section class="card">
     <div class="card-head">REGISTRATION FORM</div>
     <div class="card-body">
@@ -212,17 +270,19 @@
           <input type="email" name="email" placeholder="name@domain.com"
                  required value="{{ form.email or '' }}">
         </label>
-        <button class="btn" type="submit">SUBMIT REGISTRATION</button>
+        <button class="btn" type="submit">REGISTER FOR NOTIFICATIONS</button>
       </form>
     </div>
   </section>
+  {% endif %}
 
   <footer class="footer">
     <div>
-      <h4>NOTICE</h4>
-      <p>This automated monitoring service is provided independently. Data
-      submitted is used exclusively for notification purposes and is not
-      shared with third parties.</p>
+      <h4>PRIVACY</h4>
+      <p>Your email address is used only to send you these jury duty
+      notifications and is never shared with third parties. Your
+      subscription is automatically purged from our system the week
+      after your service ends.</p>
     </div>
     <div>
       <h4>DISCLAIMER</h4>
