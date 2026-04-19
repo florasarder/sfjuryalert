@@ -1,12 +1,26 @@
 CREATE TABLE IF NOT EXISTS subscriptions (
-  id           SERIAL PRIMARY KEY,
-  email        TEXT NOT NULL,
-  group_number INTEGER NOT NULL,
-  week_start   DATE NOT NULL,
-  created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id                 SERIAL PRIMARY KEY,
+  email              TEXT NOT NULL,
+  group_number       INTEGER NOT NULL,
+  week_start         DATE NOT NULL,
+  unsubscribe_token  TEXT UNIQUE,
+  created_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+ALTER TABLE subscriptions
+  ADD COLUMN IF NOT EXISTS unsubscribe_token TEXT;
+DO $$ BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_indexes
+    WHERE indexname = 'subscriptions_unsubscribe_token_key'
+  ) THEN
+    EXECUTE 'CREATE UNIQUE INDEX subscriptions_unsubscribe_token_key '
+         || 'ON subscriptions(unsubscribe_token)';
+  END IF;
+END $$;
 
 CREATE INDEX IF NOT EXISTS idx_subs_week ON subscriptions(week_start);
+CREATE INDEX IF NOT EXISTS idx_subs_dedupe
+  ON subscriptions(email, group_number, week_start);
 
 CREATE TABLE IF NOT EXISTS notifications_sent (
   subscription_id INTEGER NOT NULL REFERENCES subscriptions(id) ON DELETE CASCADE,

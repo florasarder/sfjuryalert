@@ -31,14 +31,55 @@ def connect() -> Iterator[psycopg.Connection]:
         yield conn
 
 
-def add_subscription(email: str, group_number: int, week_start: str) -> int:
+def add_subscription(
+    email: str, group_number: int, week_start: str, unsubscribe_token: str
+) -> int:
     with connect() as conn:
         row = conn.execute(
-            "INSERT INTO subscriptions (email, group_number, week_start) "
-            "VALUES (%s, %s, %s) RETURNING id",
-            (email, group_number, week_start),
+            "INSERT INTO subscriptions "
+            "(email, group_number, week_start, unsubscribe_token) "
+            "VALUES (%s, %s, %s, %s) RETURNING id",
+            (email, group_number, week_start, unsubscribe_token),
         ).fetchone()
         return int(row["id"])
+
+
+def find_subscription(email: str, group_number: int, week_start: str) -> Optional[dict]:
+    """Return the existing subscription matching these fields, or None."""
+    with connect() as conn:
+        return conn.execute(
+            "SELECT id, email, group_number, week_start, unsubscribe_token "
+            "FROM subscriptions "
+            "WHERE email = %s AND group_number = %s AND week_start = %s "
+            "ORDER BY created_at DESC LIMIT 1",
+            (email, group_number, week_start),
+        ).fetchone()
+
+
+def delete_by_token(token: str) -> Optional[dict]:
+    """Delete the subscription matching this token. Returns the deleted row
+    (for showing a confirmation), or None if no match."""
+    with connect() as conn:
+        return conn.execute(
+            "DELETE FROM subscriptions WHERE unsubscribe_token = %s "
+            "RETURNING email, group_number, week_start",
+            (token,),
+        ).fetchone()
+
+
+def failure_streak() -> int:
+    """Count of consecutive non-OK scrapes at the head of scrape_log.
+    Used to decide whether to alert the owner about a broken scraper."""
+    with connect() as conn:
+        rows = conn.execute(
+            "SELECT status FROM scrape_log ORDER BY ran_at DESC LIMIT 10"
+        ).fetchall()
+    streak = 0
+    for r in rows:
+        if r["status"] == "ok":
+            break
+        streak += 1
+    return streak
 
 
 def active_subscriptions(today_iso: str) -> list[dict]:
@@ -46,7 +87,7 @@ def active_subscriptions(today_iso: str) -> list[dict]:
     overlaps today."""
     with connect() as conn:
         return conn.execute(
-            "SELECT id, email, group_number, week_start "
+            "SELECT id, email, group_number, week_start, unsubscribe_token "
             "FROM subscriptions "
             "WHERE week_start - INTERVAL '3 days' <= %s::date "
             "  AND week_start + INTERVAL '4 days' >= %s::date",
@@ -57,7 +98,7 @@ def active_subscriptions(today_iso: str) -> list[dict]:
 def get_subscription(subscription_id: int) -> Optional[dict]:
     with connect() as conn:
         return conn.execute(
-            "SELECT id, email, group_number, week_start "
+            "SELECT id, email, group_number, week_start, unsubscribe_token "
             "FROM subscriptions WHERE id = %s",
             (subscription_id,),
         ).fetchone()

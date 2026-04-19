@@ -322,7 +322,30 @@
 
   {% if error %}<div class="alert err">{{ error }}</div>{% endif %}
 
-  {% if message %}
+  {% if unsubscribed %}
+  <section class="card card--success">
+    <div class="card-head">UNSUBSCRIBED</div>
+    <div class="card-body">
+      <div class="success-check" aria-hidden="true">✓</div>
+      <p class="success-text">You've been unsubscribed. We won't email
+        you again about this jury duty week.</p>
+      <p class="success-action">
+        <a href="/">Return to home</a>
+      </p>
+    </div>
+  </section>
+  {% elif unsubscribe_failed %}
+  <section class="card">
+    <div class="card-head">UNSUBSCRIBE LINK INVALID</div>
+    <div class="card-body">
+      <p class="success-text">That unsubscribe link is invalid or has already
+        been used. You may already be unsubscribed.</p>
+      <p class="success-action">
+        <a href="/">Return to home</a>
+      </p>
+    </div>
+  </section>
+  {% elif message %}
   <section class="card card--success">
     <div class="card-head">REGISTRATION CONFIRMED</div>
     <div class="card-body">
@@ -340,6 +363,7 @@
     <div class="card-head">REGISTRATION FORM</div>
     <div class="card-body">
       <form method="post" action="/subscribe">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <label class="field">
           <span class="field-label">JURY GROUP NUMBER</span>
           <input type="number" name="group_number" min="1" placeholder="000"

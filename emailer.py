@@ -61,19 +61,29 @@ def send(to: str, subject: str, text: str, html_body: str | None = None) -> None
 
 
 def notification_body(
-    group_number: int, court_day: str, time_text: str, location: str
+    group_number: int,
+    court_day: str,
+    time_text: str,
+    location: str,
+    unsubscribe_url: str | None = None,
 ) -> str:
+    footer = f"\nUnsubscribe: {unsubscribe_url}\n" if unsubscribe_url else ""
     return (
         f"Your SF jury duty group ({group_number}) has been called to report.\n\n"
         f"Date: {court_day}\n"
         f"Time: {time_text}\n"
         f"Location: {location}\n\n"
         f"Source: https://sf.courts.ca.gov/divisions/jury-reporting-instructions\n"
+        + footer
     )
 
 
 def notification_html(
-    group_number: int, court_day: str, time_text: str, location: str
+    group_number: int,
+    court_day: str,
+    time_text: str,
+    location: str,
+    unsubscribe_url: str | None = None,
 ) -> str:
     rows = _details_rows(
         [
@@ -82,6 +92,14 @@ def notification_html(
             ("TIME", time_text),
             ("LOCATION", location),
         ]
+    )
+    unsub_html = (
+        f'<p style="margin:14px 0 0; font-size:12px; color:{_MUTED};">'
+        f'No longer need these notifications? '
+        f'<a href="{html.escape(unsubscribe_url)}" '
+        f'style="color:{_TEAL}; text-decoration:underline;">Unsubscribe</a>.'
+        f"</p>"
+        if unsubscribe_url else ""
     )
     body = f"""
       <tr><td style="padding:0 32px;">
@@ -101,6 +119,7 @@ def notification_html(
           </a>
           before traveling.
         </p>
+        {unsub_html}
       </td></tr>
     """
     return _wrap("SF JURY DUTY · REPORTING NOTICE", body)
@@ -109,7 +128,12 @@ def notification_html(
 # --- Confirmation (signup) --------------------------------------------------
 
 
-def confirmation_body(group_number: int, week_start: str) -> str:
+def confirmation_body(
+    group_number: int,
+    week_start: str,
+    unsubscribe_url: str | None = None,
+) -> str:
+    footer = f"\nUnsubscribe: {unsubscribe_url}\n" if unsubscribe_url else ""
     return (
         "You're signed up for SF jury duty reporting notifications.\n\n"
         f"Group number: {group_number}\n"
@@ -117,15 +141,28 @@ def confirmation_body(group_number: int, week_start: str) -> str:
         "We'll check the SF court page every court day at 4:30pm PST from the\n"
         "Friday before your week through Thursday of your week. If your group\n"
         "is called, you'll receive an email with the date, time, and location.\n"
+        + footer
     )
 
 
-def confirmation_html(group_number: int, week_start: str) -> str:
+def confirmation_html(
+    group_number: int,
+    week_start: str,
+    unsubscribe_url: str | None = None,
+) -> str:
     rows = _details_rows(
         [
             ("GROUP NUMBER", str(group_number)),
             ("WEEK OF SERVICE", week_start),
         ]
+    )
+    unsub_html = (
+        f'<p style="margin:14px 0 0; font-size:12px; color:{_MUTED};">'
+        f'Changed your mind? '
+        f'<a href="{html.escape(unsubscribe_url)}" '
+        f'style="color:{_TEAL}; text-decoration:underline;">Unsubscribe</a>.'
+        f"</p>"
+        if unsubscribe_url else ""
     )
     body = f"""
       <tr><td style="padding:0 32px;">
@@ -139,6 +176,7 @@ def confirmation_html(group_number: int, week_start: str) -> str:
           your group is called, we'll email you the date, time, and location.
         </p>
         {rows}
+        {unsub_html}
       </td></tr>
     """
     return _wrap("SF JURY DUTY · REGISTRATION CONFIRMED", body)
@@ -257,6 +295,49 @@ def structure_change_html(old_fp: str | None, new_fp: str) -> str:
         <p style="margin:20px 0 0; font-size:13px; color:{_MUTED};">
           This alert fires once per distinct structural fingerprint, so
           routine content updates won't trigger it.
+        </p>
+      </td></tr>
+    """
+    return _wrap("SF JURY DUTY · SCRAPER ALERT", body)
+
+
+# --- Consecutive-failure alert (owner) -------------------------------------
+
+
+def scrape_failure_alert_body(streak: int, last_error: str | None) -> str:
+    return (
+        f"The SF court jury scraper has failed {streak} times in a row.\n\n"
+        "Please check the site and the Vercel function logs:\n"
+        "https://sf.courts.ca.gov/divisions/jury-reporting-instructions\n\n"
+        f"Most recent error:\n{last_error or '(no error recorded)'}\n\n"
+        "This alert fires once per streak of 3 and will not repeat until a\n"
+        "successful scrape resets the counter.\n"
+    )
+
+
+def scrape_failure_alert_html(streak: int, last_error: str | None) -> str:
+    rows = _details_rows(
+        [
+            ("CONSECUTIVE FAILURES", str(streak)),
+            ("MOST RECENT ERROR", last_error or "(no error recorded)"),
+        ]
+    )
+    body = f"""
+      <tr><td style="padding:0 32px;">
+        <p style="margin:0 0 8px; font-size:13px; letter-spacing:.22em; color:{_MUTED}; text-transform:uppercase;">Scraper alert</p>
+        <h1 style="margin:0 0 20px; font-size:22px; line-height:1.25; color:{_INK}; font-weight:700;">
+          The scraper has failed {streak} times in a row.
+        </h1>
+        <p style="margin:0 0 20px; font-size:15px; line-height:1.55; color:{_INK};">
+          Subscribers may miss notifications until this is fixed. Check the
+          <a href="https://sf.courts.ca.gov/divisions/jury-reporting-instructions"
+             style="color:{_TEAL}; text-decoration:underline;">court page</a>
+          and the Vercel function logs.
+        </p>
+        {rows}
+        <p style="margin:20px 0 0; font-size:13px; color:{_MUTED};">
+          This alert fires once per streak of 3 and won't repeat until a
+          successful scrape resets the counter.
         </p>
       </td></tr>
     """

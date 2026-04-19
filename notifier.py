@@ -31,6 +31,7 @@ def run_all(today: Optional[date] = None) -> int:
             email=sub["email"],
             group_number=sub["group_number"],
             week_start=sub["week_start"],
+            unsubscribe_token=sub.get("unsubscribe_token"),
             blocks=blocks,
         )
     return sent
@@ -51,8 +52,16 @@ def run_for_subscription(subscription_id: int) -> int:
         email=sub["email"],
         group_number=sub["group_number"],
         week_start=sub["week_start"],
+        unsubscribe_token=sub.get("unsubscribe_token"),
         blocks=blocks,
     )
+
+
+def _unsubscribe_url(token: str | None) -> str | None:
+    if not token:
+        return None
+    base = os.environ.get("PUBLIC_BASE_URL", "https://sfjuryalert.com").rstrip("/")
+    return f"{base}/unsubscribe?t={token}"
 
 
 def _fetch_and_parse() -> Optional[list]:
@@ -61,6 +70,7 @@ def _fetch_and_parse() -> Optional[list]:
     except Exception as exc:  # noqa: BLE001
         log.exception("scrape fetch failed")
         db.log_scrape(status="http_error", error=str(exc))
+        _alert_if_failure_streak(str(exc))
         return None
 
     fingerprint = scraper.structural_fingerprint(html)
@@ -71,6 +81,7 @@ def _fetch_and_parse() -> Optional[list]:
     except Exception as exc:  # noqa: BLE001
         log.exception("scrape parse failed")
         db.log_scrape(status="parse_error", error=str(exc), page_fingerprint=fingerprint)
+        _alert_if_failure_streak(str(exc))
         return None
     db.log_scrape(status="ok", blocks=len(blocks), page_fingerprint=fingerprint)
     return blocks
@@ -97,14 +108,36 @@ def _alert_if_structure_changed(new_fp: str) -> None:
         log.exception("structure-change alert failed")
 
 
+def _alert_if_failure_streak(last_error: str | None) -> None:
+    """Alert the owner when we hit exactly 3 consecutive non-OK scrapes.
+    Firing only at ==3 means one email per outage, not one per failing run."""
+    try:
+        streak = db.failure_streak()
+        if streak != 3:
+            return
+        owner = os.environ.get("OWNER_EMAIL")
+        if not owner:
+            return
+        emailer.send(
+            to=owner,
+            subject=f"sfjuryalert.com — scraper failed {streak}x in a row",
+            text=emailer.scrape_failure_alert_body(streak, last_error),
+            html_body=emailer.scrape_failure_alert_html(streak, last_error),
+        )
+    except Exception:  # noqa: BLE001
+        log.exception("failure-streak alert failed")
+
+
 def _notify_subscription(
     sub_id: int,
     email: str,
     group_number: int,
     week_start: date,
+    unsubscribe_token: str | None,
     blocks: list,
 ) -> int:
     week_end = week_start + timedelta(days=4)  # Mon..Fri inclusive
+    unsub_url = _unsubscribe_url(unsubscribe_token)
     sent = 0
     for block in blocks:
         if group_number not in block.group_numbers:
@@ -114,22 +147,28 @@ def _notify_subscription(
         if db.already_notified(sub_id, block.court_day):
             continue
 
-        emailer.send(
-            to=email,
-            subject=f"SF jury duty: report on {block.court_day.strftime('%A, %B %d')}",
-            text=emailer.notification_body(
-                group_number=group_number,
-                court_day=block.court_day.strftime("%A, %B %d, %Y"),
-                time_text=block.time_text,
-                location=block.location,
-            ),
-            html_body=emailer.notification_html(
-                group_number=group_number,
-                court_day=block.court_day.strftime("%A, %B %d, %Y"),
-                time_text=block.time_text,
-                location=block.location,
-            ),
-        )
+        try:
+            emailer.send(
+                to=email,
+                subject=f"SF jury duty: report on {block.court_day.strftime('%A, %B %d')}",
+                text=emailer.notification_body(
+                    group_number=group_number,
+                    court_day=block.court_day.strftime("%A, %B %d, %Y"),
+                    time_text=block.time_text,
+                    location=block.location,
+                    unsubscribe_url=unsub_url,
+                ),
+                html_body=emailer.notification_html(
+                    group_number=group_number,
+                    court_day=block.court_day.strftime("%A, %B %d, %Y"),
+                    time_text=block.time_text,
+                    location=block.location,
+                    unsubscribe_url=unsub_url,
+                ),
+            )
+        except Exception:  # noqa: BLE001
+            log.exception("notification email send failed for sub_id=%s", sub_id)
+            continue
         db.record_notification(sub_id, block.court_day)
         db.log_event("notification")
         sent += 1

@@ -7,8 +7,10 @@ work both locally and on Vercel.
 
 from __future__ import annotations
 
+import hmac
 import os
 import re
+import secrets
 import sys
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -22,7 +24,7 @@ from dotenv import load_dotenv
 load_dotenv(_PROJECT_ROOT / ".env")
 
 import pytz
-from flask import Flask, abort, jsonify, render_template, request
+from flask import Flask, Response, abort, jsonify, make_response, render_template, request
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
@@ -32,6 +34,8 @@ import notifier
 
 PACIFIC = pytz.timezone("America/Los_Angeles")
 EMAIL_RE = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+CSRF_COOKIE = "csrf_token"
+TESTING_EMAIL = os.environ.get("TESTING_EMAIL", "flammeus@gmail.com").lower()
 
 app = Flask(
     __name__,
@@ -52,17 +56,15 @@ limiter = Limiter(
 @app.route("/", methods=["GET"])
 def index():
     db.log_event("page_view")
-    return render_template(
-        "form.html", form={}, message=None, error=None,
-        today=date.today().isoformat(),
-        feedback_email=os.environ.get("FEEDBACK_EMAIL", "info@sfjuryalert.com"),
-        last_check=_last_check_display(),
-    )
+    return _render_form(form={}, message=None, error=None)
 
 
 @app.route("/subscribe", methods=["POST"])
 @limiter.limit("5/hour;20/day")
 def subscribe():
+    if not _csrf_ok(request):
+        abort(400, description="Invalid or missing CSRF token.")
+
     form = {
         "email": (request.form.get("email") or "").strip().lower(),
         "group_number": (request.form.get("group_number") or "").strip(),
@@ -71,41 +73,93 @@ def subscribe():
 
     error = _validate(form)
     if error:
-        return render_template(
-            "form.html", form=form, error=error, message=None,
-            today=date.today().isoformat(),
-            feedback_email=os.environ.get("FEEDBACK_EMAIL", "info@sfjuryalert.com"),
-            last_check=_last_check_display(),
+        return _render_form(form=form, error=error, message=None)
+
+    group_num = int(form["group_number"])
+
+    # Dedupe: one subscription per (email, group, week). Exception for the
+    # testing email so the owner can still re-subscribe during QA.
+    existing = db.find_subscription(form["email"], group_num, form["week_start"])
+    if existing and form["email"] != TESTING_EMAIL:
+        return _render_form(
+            form={}, error=None,
+            message=(
+                f"You're already signed up. We'll email {form['email']} if "
+                f"group {form['group_number']} is called."
+            ),
         )
 
+    token = secrets.token_urlsafe(24)
     sub_id = db.add_subscription(
         email=form["email"],
-        group_number=int(form["group_number"]),
+        group_number=group_num,
         week_start=form["week_start"],
+        unsubscribe_token=token,
     )
     db.log_event("registration")
 
-    emailer.send(
-        to=form["email"],
-        subject="Signed up for SF jury duty notifications",
-        text=emailer.confirmation_body(int(form["group_number"]), form["week_start"]),
-        html_body=emailer.confirmation_html(
-            int(form["group_number"]), form["week_start"]
-        ),
-    )
+    unsub_url = _unsubscribe_url(token)
+    try:
+        emailer.send(
+            to=form["email"],
+            subject="Signed up for SF jury duty notifications",
+            text=emailer.confirmation_body(
+                group_num, form["week_start"], unsubscribe_url=unsub_url
+            ),
+            html_body=emailer.confirmation_html(
+                group_num, form["week_start"], unsubscribe_url=unsub_url
+            ),
+        )
+    except Exception:  # noqa: BLE001
+        app.logger.exception("confirmation email failed for sub_id=%s", sub_id)
 
     _maybe_immediate_scrape(sub_id, form["week_start"])
 
-    return render_template(
-        "form.html", form={}, error=None,
+    return _render_form(
+        form={}, error=None,
         message=(
             f"Subscribed. We'll email {form['email']} if group "
             f"{form['group_number']} is called."
         ),
-        today=date.today().isoformat(),
-        feedback_email=os.environ.get("FEEDBACK_EMAIL", "info@sfjuryalert.com"),
-        last_check=_last_check_display(),
     )
+
+
+@app.route("/unsubscribe", methods=["GET"])
+def unsubscribe():
+    token = (request.args.get("t") or "").strip()
+    removed = db.delete_by_token(token) if token else None
+    return _render_form(
+        form={}, error=None, message=None,
+        unsubscribed=bool(removed),
+        unsubscribe_failed=(not removed),
+    )
+
+
+@app.route("/robots.txt", methods=["GET"])
+def robots_txt() -> Response:
+    base = _public_base_url()
+    body = (
+        "User-agent: *\n"
+        "Allow: /\n"
+        "Disallow: /api/\n"
+        "Disallow: /unsubscribe\n"
+        f"Sitemap: {base}/sitemap.xml\n"
+    )
+    return Response(body, mimetype="text/plain")
+
+
+@app.route("/sitemap.xml", methods=["GET"])
+def sitemap_xml() -> Response:
+    base = _public_base_url()
+    today = date.today().isoformat()
+    body = (
+        '<?xml version="1.0" encoding="UTF-8"?>\n'
+        '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+        f"  <url><loc>{base}/</loc><lastmod>{today}</lastmod>"
+        "<changefreq>weekly</changefreq><priority>1.0</priority></url>\n"
+        "</urlset>\n"
+    )
+    return Response(body, mimetype="application/xml")
 
 
 @app.route("/api/scrape", methods=["GET", "POST"])
@@ -156,6 +210,59 @@ def api_init():
     _require_cron_auth()
     db.init_db()
     return jsonify({"ok": True}), 200
+
+
+def _render_form(
+    form: dict,
+    message: str | None,
+    error: str | None,
+    unsubscribed: bool = False,
+    unsubscribe_failed: bool = False,
+) -> Response:
+    """Render the landing template and ensure a CSRF cookie is set.
+    Token is generated per-visitor if absent; reused otherwise."""
+    token = request.cookies.get(CSRF_COOKIE) or secrets.token_urlsafe(24)
+    html = render_template(
+        "form.html",
+        form=form,
+        message=message,
+        error=error,
+        today=date.today().isoformat(),
+        feedback_email=os.environ.get("FEEDBACK_EMAIL", "info@sfjuryalert.com"),
+        last_check=_last_check_display(),
+        csrf_token=token,
+        unsubscribed=unsubscribed,
+        unsubscribe_failed=unsubscribe_failed,
+    )
+    resp = make_response(html)
+    if request.cookies.get(CSRF_COOKIE) != token:
+        resp.set_cookie(
+            CSRF_COOKIE, token,
+            max_age=60 * 60 * 24 * 7,
+            secure=not app.debug,
+            httponly=False,  # template reads it via form field, not JS
+            samesite="Lax",
+        )
+    return resp
+
+
+def _csrf_ok(req) -> bool:
+    cookie_tok = req.cookies.get(CSRF_COOKIE) or ""
+    form_tok = (req.form.get("csrf_token") or "").strip()
+    if not cookie_tok or not form_tok:
+        return False
+    return hmac.compare_digest(cookie_tok, form_tok)
+
+
+def _public_base_url() -> str:
+    base = os.environ.get("PUBLIC_BASE_URL")
+    if base:
+        return base.rstrip("/")
+    return request.host_url.rstrip("/")
+
+
+def _unsubscribe_url(token: str) -> str:
+    return f"{_public_base_url()}/unsubscribe?t={token}"
 
 
 def _require_cron_auth() -> None:
