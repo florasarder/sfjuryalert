@@ -198,6 +198,7 @@
     margin-top: 0.5rem;
   }
   .btn:hover { background: #162033; }
+  .btn[disabled] { background: #8893a6; cursor: wait; }
 
   .card--success .card-body { background: var(--tile-green); }
   .success-text {
@@ -417,5 +418,79 @@
   </footer>
 
 </div>
+
+<script>
+(function () {
+  const form = document.querySelector('form[action="/subscribe"]');
+  if (!form) return;
+  const card = form.closest('.card');
+  const btn = form.querySelector('.btn');
+  const originalLabel = btn.textContent;
+
+  function escapeHtml(s) {
+    return String(s).replace(/[&<>"']/g, c => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    }[c]));
+  }
+
+  function showError(text) {
+    let alert = document.querySelector('.alert.err');
+    if (!alert) {
+      alert = document.createElement('div');
+      alert.className = 'alert err';
+      card.parentNode.insertBefore(alert, card);
+    }
+    alert.textContent = text;
+  }
+
+  function clearError() {
+    const alert = document.querySelector('.alert.err');
+    if (alert) alert.remove();
+  }
+
+  function swapToSuccess(message) {
+    const successHtml = `
+      <section class="card card--success">
+        <div class="card-head">REGISTRATION CONFIRMED</div>
+        <div class="card-body">
+          <div class="success-check" aria-hidden="true">&#10003;</div>
+          <p class="success-text">${escapeHtml(message)}</p>
+          <p class="success-sub">You can close this page. We'll email you if
+          your group is called during your week of service.</p>
+          <p class="success-action"><a href="/">Register another week</a></p>
+        </div>
+      </section>
+    `;
+    card.outerHTML = successHtml;
+  }
+
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    clearError();
+    btn.disabled = true;
+    btn.textContent = 'SUBMITTING…';
+
+    try {
+      const res = await fetch('/subscribe', {
+        method: 'POST',
+        body: new FormData(form),
+        headers: { 'X-Requested-With': 'fetch' },
+      });
+      const data = await res.json();
+      if (data.ok) {
+        swapToSuccess(data.message);
+      } else {
+        showError(data.error || 'Something went wrong. Please try again.');
+        btn.disabled = false;
+        btn.textContent = originalLabel;
+      }
+    } catch (err) {
+      showError('Network error. Please try again.');
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+    }
+  });
+})();
+</script>
 </body>
 </html>

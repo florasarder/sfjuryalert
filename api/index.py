@@ -62,7 +62,11 @@ def index():
 @app.route("/subscribe", methods=["POST"])
 @limiter.limit("5/hour;20/day")
 def subscribe():
+    wants_json = request.headers.get("X-Requested-With") == "fetch"
+
     if not _csrf_ok(request):
+        if wants_json:
+            return jsonify({"ok": False, "error": "Invalid session. Please refresh and try again."}), 400
         abort(400, description="Invalid or missing CSRF token.")
 
     form = {
@@ -73,6 +77,8 @@ def subscribe():
 
     error = _validate(form)
     if error:
+        if wants_json:
+            return jsonify({"ok": False, "error": error}), 400
         return _render_form(form=form, error=error, message=None)
 
     group_num = int(form["group_number"])
@@ -81,13 +87,13 @@ def subscribe():
     # testing email so the owner can still re-subscribe during QA.
     existing = db.find_subscription(form["email"], group_num, form["week_start"])
     if existing and form["email"] != TESTING_EMAIL:
-        return _render_form(
-            form={}, error=None,
-            message=(
-                f"You're already signed up. We'll email {form['email']} if "
-                f"group {form['group_number']} is called."
-            ),
+        msg = (
+            f"You're already signed up. We'll email {form['email']} if "
+            f"group {form['group_number']} is called."
         )
+        if wants_json:
+            return jsonify({"ok": True, "message": msg}), 200
+        return _render_form(form={}, error=None, message=msg)
 
     token = secrets.token_urlsafe(24)
     sub_id = db.add_subscription(
@@ -115,13 +121,13 @@ def subscribe():
 
     _maybe_immediate_scrape(sub_id, form["week_start"])
 
-    return _render_form(
-        form={}, error=None,
-        message=(
-            f"Subscribed. We'll email {form['email']} if group "
-            f"{form['group_number']} is called."
-        ),
+    msg = (
+        f"Subscribed. We'll email {form['email']} if group "
+        f"{form['group_number']} is called."
     )
+    if wants_json:
+        return jsonify({"ok": True, "message": msg}), 200
+    return _render_form(form={}, error=None, message=msg)
 
 
 @app.route("/unsubscribe", methods=["GET"])
