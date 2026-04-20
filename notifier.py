@@ -150,7 +150,7 @@ def _notify_subscription(
         try:
             emailer.send(
                 to=email,
-                subject=f"SF jury duty: report on {block.court_day.strftime('%A, %B %d')}",
+                subject=f"Report for SF jury duty on {block.court_day.strftime('%A, %B %d')}",
                 text=emailer.notification_body(
                     group_number=group_number,
                     court_day=block.court_day.strftime("%A, %B %d, %Y"),

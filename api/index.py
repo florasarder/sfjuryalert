@@ -102,7 +102,7 @@ def subscribe():
     try:
         emailer.send(
             to=form["email"],
-            subject="Signed up for SF jury duty notifications",
+            subject="You're signed up for SF jury duty notifications",
             text=emailer.confirmation_body(
                 group_num, form["week_start"], unsubscribe_url=unsub_url
             ),
