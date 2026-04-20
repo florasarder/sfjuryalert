@@ -27,7 +27,13 @@ _BORDER = "#d8dde3"
 _TILE_BG = "#f7f9fb"
 
 
-def send(to: str, subject: str, text: str, html_body: str | None = None) -> None:
+def send(
+    to: str,
+    subject: str,
+    text: str,
+    html_body: str | None = None,
+    list_unsubscribe_url: str | None = None,
+) -> None:
     host = os.environ.get("SMTP_HOST")
     if not host:
         if os.environ.get("JURY_ENV") == "production":
@@ -47,6 +53,13 @@ def send(to: str, subject: str, text: str, html_body: str | None = None) -> None
     msg["From"] = sender
     msg["To"] = to
     msg["Subject"] = subject
+    if list_unsubscribe_url:
+        # RFC 2369 + RFC 8058: Gmail/Outlook show a native "Unsubscribe"
+        # button and, if a user clicks it, POST to this URL without any
+        # browser interaction. Improves deliverability because the button
+        # is a trusted alternative to "Mark as spam".
+        msg["List-Unsubscribe"] = f"<{list_unsubscribe_url}>"
+        msg["List-Unsubscribe-Post"] = "List-Unsubscribe=One-Click"
     msg.set_content(text)
     if html_body:
         msg.add_alternative(html_body, subtype="html")

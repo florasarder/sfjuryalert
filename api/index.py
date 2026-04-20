@@ -115,6 +115,7 @@ def subscribe():
             html_body=emailer.confirmation_html(
                 group_num, form["week_start"], unsubscribe_url=unsub_url
             ),
+            list_unsubscribe_url=unsub_url,
         )
     except Exception:  # noqa: BLE001
         app.logger.exception("confirmation email failed for sub_id=%s", sub_id)
@@ -130,10 +131,19 @@ def subscribe():
     return _render_form(form={}, error=None, message=msg)
 
 
-@app.route("/unsubscribe", methods=["GET"])
+@app.route("/unsubscribe", methods=["GET", "POST"])
 def unsubscribe():
-    token = (request.args.get("t") or "").strip()
+    # GET: user clicked the link — render confirmation UI.
+    # POST: Gmail/Outlook one-click (RFC 8058) — no UI, just return 200.
+    token = (
+        (request.args.get("t") or "").strip()
+        or (request.form.get("t") or "").strip()
+    )
     removed = db.delete_by_token(token) if token else None
+
+    if request.method == "POST":
+        return ("", 200) if removed else ("", 404)
+
     return _render_form(
         form={}, error=None, message=None,
         unsubscribed=bool(removed),

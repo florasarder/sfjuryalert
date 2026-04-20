@@ -165,6 +165,7 @@ def _notify_subscription(
                     location=block.location,
                     unsubscribe_url=unsub_url,
                 ),
+                list_unsubscribe_url=unsub_url,
             )
         except Exception:  # noqa: BLE001
             log.exception("notification email send failed for sub_id=%s", sub_id)
