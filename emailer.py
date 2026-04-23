@@ -151,10 +151,9 @@ def confirmation_body(
         "You're signed up for SF jury duty reporting notifications.\n\n"
         f"Group number: {group_number}\n"
         f"Week of service: {week_start}\n\n"
-        "We'll check the SF court page every court day in the afternoon, from\n"
-        "the Friday before your week through Thursday of your week. If your\n"
-        "group is called, you'll receive an email with the date, time, and\n"
-        "location.\n"
+        "We'll check the SF court page every evening, from the Friday before\n"
+        "your week through Thursday of your week. If your group is called,\n"
+        "you'll receive an email with the date, time, and location.\n"
         + footer
     )
 
@@ -185,10 +184,9 @@ def confirmation_html(
           You're signed up for jury duty notifications.
         </h1>
         <p style="margin:0 0 24px; font-size:15px; line-height:1.55; color:{_INK};">
-          We'll check the Superior Court website every court day in the
-          afternoon, from the Friday before your week through Thursday of your
-          week. If your group is called, we'll email you the date, time, and
-          location.
+          We'll check the Superior Court website every evening, from the
+          Friday before your week through Thursday of your week. If your group
+          is called, we'll email you the date, time, and location.
         </p>
         {rows}
         {unsub_html}
